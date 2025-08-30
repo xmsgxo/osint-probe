@@ -1,32 +1,63 @@
 import httpx
+from bs4 import BeautifulSoup
 
-async def check_email_breaches(email, api_key):
-    """Checks an email against the Have I Been Pwned API."""
+# We will use a public website as our data source
+URL = "https://www.avast.com/hackcheck/"
+
+async def check_email_breaches(email):
+    """
+    Scrapes a public website to check for email breaches,
+    since the HIBP API is no longer free.
+    """
     print(f"\n--- 📧 Email Breach Analysis for {email} ---")
-    if not api_key or api_key == "YOUR_API_KEY_HERE":
-        print("❌ HIBP API Key not found in config.py. Please create the file and add your key.")
-        return
-
-    url = f"https://haveibeenpwned.com/api/v3/breachedaccount/{email}"
-    headers = {
-        "hibp-api-key": api_key,
-        "user-agent": "OSINT-Probe"
-    }
+    print("Checking public breach databases... (This may take a moment)")
 
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=headers)
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            # First, get the necessary cookies and CSRF token from the site
+            initial_response = await client.get(URL)
+            initial_response.raise_for_status() # Raise an exception for bad status codes
+            
+            soup = BeautifulSoup(initial_response.text, 'html.parser')
+            # Find the security token needed to submit the form
+            csrf_token = soup.find('input', {'name': '_csrf_token'})
+            
+            if not csrf_token:
+                print("❌ Could not find the necessary security token to submit the form.")
+                return
 
-            if response.status_code == 200:
-                breaches = response.json()
+            # Now, submit the email to the website's form
+            form_data = {
+                'email': email,
+                '_csrf_token': csrf_token['value']
+            }
+            
+            check_response = await client.post(URL, data=form_data)
+            check_response.raise_for_status()
+            
+            # Parse the results page
+            results_soup = BeautifulSoup(check_response.text, 'html.parser')
+            
+            # Look for the section that lists the breaches
+            leaks_list = results_soup.find('ul', {'class': 'leaks-list'})
+            
+            if leaks_list:
+                breaches = leaks_list.find_all('li')
                 print(f"🚨 DANGER: Email found in {len(breaches)} data breaches!")
                 for breach in breaches:
-                    print(f"  - Breach: {breach['Name']} ({breach['BreachDate']})")
-            elif response.status_code == 404:
-                print("✅ GOOD: Email not found in any known data breaches.")
+                    site_name = breach.find('span', {'class': 'site-name'})
+                    if site_name:
+                        print(f"  - Breach Source: {site_name.text.strip()}")
             else:
-                print(f"❌ Error: Received status code {response.status_code}")
-                print(f"   Message: {response.text}")
+                 # Check for a "no results" message
+                no_results = results_soup.find(text=lambda t: "no leaks were found" in t.lower())
+                if no_results:
+                    print("✅ GOOD: Email not found in any known data breaches.")
+                else:
+                    print("🤔 Could not determine the result. The website may have changed.")
 
+
+    except httpx.RequestError as e:
+        print(f"❌ An error occurred: Could not connect to the data source. {e}")
     except Exception as e:
-        print(f"An error occurred during the request: {e}")
+        print(f"An unexpected error occurred: {e}")
