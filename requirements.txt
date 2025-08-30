@@ -1,3 +1,4 @@
 phonenumbers
 colorama
 httpx
+beautifulsoup4
