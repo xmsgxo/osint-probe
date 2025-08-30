@@ -3,3 +3,5 @@ colorama
 httpx
 beautifulsoup4
 Pillow
+stegano
+numpy
