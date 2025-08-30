@@ -18,7 +18,7 @@ def print_banner():
     ██╔═══╝ ╚════██║██║██╔══██║   ██║   
     ██║     ███████║██║██║  ██║   ██║   
     ╚═╝     ╚══════╝╚═╝╚═╝  ╚═╝   ╚═╝   
-    OSINT-Probe v1.0
+    OSINT-Probe v2.0
     """
     print(Fore.CYAN + banner)
     print(Style.RESET_ALL)
@@ -27,11 +27,15 @@ async def main():
     parser = argparse.ArgumentParser(description="OSINT-Probe: A modular OSINT tool.")
     parser.add_argument("-u", "--username", help="Username to search for.")
     parser.add_argument("-e", "--email", help="Email address to check for breaches.")
-    parser.add_argument("-p", "--phone", help="Phone number to analyze (in international format, e.g., +14158586273).")
-    parser.add_argument("-i", "--image", help="Path or URL to an image for analysis.")
-    
+    parser.add_argument("-p", "--phone", help="Phone number to analyze (in international format).")
+
+    image_group = parser.add_argument_group("Image Analysis Options")
+    image_group.add_argument("-i", "--image", help="Path or URL to an image for analysis.")
+    image_group.add_argument("--ela", action="store_true", help="Perform Error Level Analysis on the image.")
+    image_group.add_argument("--stega", action="store_true", help="Check for hidden steganographic data in the image.")
+
     args = parser.parse_args()
-    
+
     if not any(vars(args).values()):
         parser.print_help()
         return
@@ -45,7 +49,7 @@ async def main():
     if args.phone:
         analyze_phone_number(args.phone)
     if args.image:
-        await analyze_image(args.image)
+        await analyze_image(args.image, do_ela=args.ela, do_stega=args.stega)
 
 if __name__ == "__main__":
     asyncio.run(main())
