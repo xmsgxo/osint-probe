@@ -42,7 +42,7 @@ async def main():
     if args.username:
         await find_username(args.username)
     if args.email:
-        await check_email_breaches(args.email, config.HIBP_API_KEY)
+        await check_email_breaches(args.email)
     if args.phone:
         analyze_phone_number(args.phone)
 
